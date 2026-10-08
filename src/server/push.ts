@@ -28,6 +28,27 @@ export function pushPublicKey(): string | null {
   return pushConfigured() ? process.env.VAPID_PUBLIC_KEY || null : null;
 }
 
+const PUSH_HOST_SUFFIXES = [
+  "fcm.googleapis.com",
+  "android.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+  "notify.windows.com",
+  "wns.windows.com",
+];
+
+export function isPushEndpoint(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_HOST_SUFFIXES.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}
+
 export function setPushSenderForTests(sender: PushSender | null): void {
   senderOverride = sender;
 }
@@ -42,9 +63,16 @@ interface PendingPush {
 }
 
 const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000, 3 * 60 * 60_000];
+const SEND_LEASE_MS = 60_000;
 
 export async function processPushQueue(now = Date.now()): Promise<void> {
   if (!pushConfigured() && !senderOverride) return;
+  run(
+    `UPDATE notifications SET status = 'pending'
+     WHERE channel = 'web_push' AND status = 'sending'
+     AND (next_attempt_at IS NULL OR next_attempt_at <= ?)`,
+    now,
+  );
   const pending = many<PendingPush>(
     `SELECT id, user_id, petal_id, attempt_count, title, body
      FROM notifications
@@ -54,7 +82,9 @@ export async function processPushQueue(now = Date.now()): Promise<void> {
   );
   for (const item of pending) {
     const claimed = run(
-      `UPDATE notifications SET status = 'sending', attempt_count = attempt_count + 1 WHERE id = ? AND status = 'pending'`,
+      `UPDATE notifications SET status = 'sending', attempt_count = attempt_count + 1, next_attempt_at = ?
+       WHERE id = ? AND status = 'pending'`,
+      now + SEND_LEASE_MS,
       item.id,
     );
     if (claimed.changes !== 1) continue;
@@ -77,21 +107,19 @@ export async function processPushQueue(now = Date.now()): Promise<void> {
       continue;
     }
     let failed: unknown = null;
-    let gone = false;
     for (const subscription of subscriptions) {
       try {
         await sendOne(subscription, { title: item.title, body: item.body, url: "/" });
       } catch (error) {
         const status = statusCode(error);
         if (status === 404 || status === 410) {
-          gone = true;
           run("DELETE FROM push_subscriptions WHERE id = ?", subscription.id);
         } else {
           failed = error;
         }
       }
     }
-    if (failed && !gone) {
+    if (failed) {
       const attempts = item.attempt_count + 1;
       if (attempts >= 5) {
         run(

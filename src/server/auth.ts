@@ -17,7 +17,11 @@ const displayNameSchema = z
   .trim()
   .min(1, "name")
   .max(40, "name")
-  .refine((value) => !/[\u0000-\u001f]/.test(value), "name");
+  .refine((value) => !/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/.test(value), "name");
+
+function hasClientAddress(ip: string): boolean {
+  return ip !== "" && ip !== "local" && ip !== "unknown";
+}
 
 const emailSchema = z.string().trim().email().max(254);
 const passwordSchema = z.string().min(10).max(200);
@@ -96,7 +100,7 @@ export function signUp(input: {
   const { email, password, displayName } = parsed.data;
   const timezone = requireTimezone(parsed.data.timezone);
 
-  assertNotLimited(`signup:ip:${ip}`, 8, SIGNUP_WINDOW, now);
+  if (hasClientAddress(ip)) assertNotLimited(`signup:ip:${ip}`, 8, SIGNUP_WINDOW, now);
   assertNotLimited(`signup:email:${email}`, 5, SIGNUP_WINDOW, now);
 
   const passwordHash = hashPassword(password);
@@ -118,7 +122,7 @@ export function signUp(input: {
       insertSession(session, now);
     });
   } catch (error) {
-    recordHit(`signup:ip:${ip}`, SIGNUP_WINDOW, now);
+    if (hasClientAddress(ip)) recordHit(`signup:ip:${ip}`, SIGNUP_WINDOW, now);
     recordHit(`signup:email:${email}`, SIGNUP_WINDOW, now);
     if (isUniqueViolation(error)) {
       throw new AppError("EMAIL_IN_USE", "An account with that email already exists.", 409);
@@ -143,13 +147,13 @@ export function signIn(input: {
   const emailKey = `signin:email:${email}`;
   const ipKey = `signin:ip:${ip}`;
   assertNotLimited(emailKey, 8, SIGNIN_WINDOW, now);
-  assertNotLimited(ipKey, 40, SIGNIN_WINDOW, now);
+  if (hasClientAddress(ip)) assertNotLimited(ipKey, 40, SIGNIN_WINDOW, now);
 
   const user = one<UserRow>("SELECT * FROM users WHERE email = ? AND deleted_at IS NULL", email);
   const ok = verifyPasswordOrDummy(input.password, user?.password_hash ?? null) && Boolean(user);
   if (!ok || !user) {
     recordHit(emailKey, SIGNIN_WINDOW, now);
-    recordHit(ipKey, SIGNIN_WINDOW, now);
+    if (hasClientAddress(ip)) recordHit(ipKey, SIGNIN_WINDOW, now);
     throw new AppError("INVALID_CREDENTIALS", "That email or password did not match.", 401);
   }
   const session = makeSession(user.id, input.userAgent, now);
@@ -209,7 +213,9 @@ export function changePassword(
 ): void {
   const user = requireUser(userId);
   passwordSchema.parse(nextPassword);
+  assertNotLimited(`password:${userId}`, 8, SIGNIN_WINDOW, now);
   if (!verifyPasswordOrDummy(currentPassword, user.password_hash)) {
+    recordHit(`password:${userId}`, SIGNIN_WINDOW, now);
     throw new AppError("INVALID_CREDENTIALS", "That password did not match.", 401);
   }
   const passwordHash = hashPassword(nextPassword);

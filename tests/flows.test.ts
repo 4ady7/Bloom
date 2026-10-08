@@ -88,7 +88,8 @@ describe("petals", () => {
     ]);
     const rows = many<{ count: number }>("SELECT COUNT(*) AS count FROM petals");
     expect(Number(rows[0].count)).toBe(2);
-    expect(getPetal(bea.user.id, first.petal.id).content).toMatchObject({ text: "hello" });
+    expect(getPetal(bea.user.id, first.petal.id).content).toMatchObject({ text: "" });
+    expect(getPetal(ada.user.id, first.petal.id).content).toMatchObject({ text: "hello" });
   });
 
   it("does not create a second petal when the same key is reused with different words", async () => {
@@ -139,6 +140,7 @@ describe("petals", () => {
     expect(Number(notes[0].count)).toBe(1);
     const opened = openPetal(bea.user.id, scheduled.petal.id, now + 4 * 60 * 60 * 1000);
     expect(opened.status).toBe("opened");
+    expect(opened.content).toMatchObject({ text: "later" });
     expect(openPetal(bea.user.id, scheduled.petal.id, now + 4 * 60 * 60 * 1000 + 1000).openedAt).toBe(opened.openedAt);
     expect(() => deletePetal(ada.user.id, scheduled.petal.id)).toThrow(/stays in the garden/);
 
@@ -223,9 +225,13 @@ describe("petals", () => {
     expect(updated.content).toMatchObject({ text: "second" });
     expect(await deliverDuePetals(now + 4 * 60 * 60 * 1000)).toBe(0);
     expect(await deliverDuePetals(now + 6 * 60 * 60 * 1000)).toBe(1);
-    expect(getPetal(bea.user.id, created.petal.id).content).toMatchObject({ text: "second" });
+    expect(getPetal(bea.user.id, created.petal.id).content).toMatchObject({ text: "" });
+    expect(getPetal(ada.user.id, created.petal.id).content).toMatchObject({ text: "second" });
     expect(await deliverDuePetals(now + 31 * 60 * 60 * 1000)).toBe(0);
-    expect(getPetal(bea.user.id, created.petal.id).status).toBe("expired");
+    const faded = getPetal(bea.user.id, created.petal.id);
+    expect(faded.status).toBe("expired");
+    expect(faded.content).toMatchObject({ text: "" });
+    expect(getPetal(ada.user.id, created.petal.id).content).toMatchObject({ text: "second" });
   });
 });
 

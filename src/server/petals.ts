@@ -376,15 +376,22 @@ export function answerPetal(userId: string, petalId: string, idempotencyKey: str
       if (existing.body === answer) return;
       throw new AppError("ALREADY_ANSWERED", "You already left an answer.", 409);
     }
-    run(
-      `INSERT INTO petal_responses (id, petal_id, author_id, body, created_at, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
-      newId(),
-      petalId,
-      userId,
-      answer,
-      now,
-      idempotencyKey,
-    );
+    try {
+      run(
+        `INSERT INTO petal_responses (id, petal_id, author_id, body, created_at, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
+        newId(),
+        petalId,
+        userId,
+        answer,
+        now,
+        idempotencyKey,
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const winner = one<{ body: string }>("SELECT body FROM petal_responses WHERE petal_id = ?", petalId);
+      if (winner?.body === answer) return;
+      throw new AppError("ALREADY_ANSWERED", "You already left an answer.", 409);
+    }
     insertAnswerNotification({ petalId, recipientUserId: row.sender_id, now });
   });
   return getPetal(userId, petalId);
@@ -524,10 +531,15 @@ function toPublic(row: PetalRow, viewerId: string): PublicPetal {
     "SELECT body, created_at FROM petal_responses WHERE petal_id = ?",
     row.id,
   );
+  const unopened = row.opened_at == null && (row.status === "sealed" || row.status === "expired");
+  const content =
+    row.recipient_id === viewerId && unopened
+      ? concealedContent(row.type)
+      : (JSON.parse(row.content_json) as PetalContent);
   return {
     id: row.id,
     type: row.type,
-    content: JSON.parse(row.content_json) as PetalContent,
+    content,
     metadata: JSON.parse(row.metadata_json) as PetalMetadata,
     status: row.status,
     fromYou: row.sender_id === viewerId,
@@ -587,6 +599,25 @@ function decodeCursor(cursor: string | null): { createdAt: number; id: string } 
     return { createdAt, id };
   } catch {
     throw new AppError("INVALID_INPUT", "That page could not be read.", 400);
+  }
+}
+
+function concealedContent(type: PetalType): PetalContent {
+  switch (type) {
+    case "note":
+      return { text: "" };
+    case "flower":
+      return { variety: "ranunculus", note: "" };
+    case "memory":
+      return { title: "", date: "", place: "", text: "", mediaId: null };
+    case "photo":
+      return { mediaId: "00000000-0000-4000-8000-000000000000", caption: "" };
+    case "song":
+      return { title: "", artist: "", url: "", note: "", mediaId: null };
+    case "question":
+      return { prompt: "", senderNote: "" };
+    case "surprise":
+      return { kind: "seal", message: "" };
   }
 }
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { newId } from "@/server/crypto";
 import { AppError } from "@/server/errors";
 import { assertMutation, json, readJson, withErrors } from "@/server/http";
-import { pushConfigured, pushPublicKey, removeSubscription, saveSubscription } from "@/server/push";
+import { isPushEndpoint, pushConfigured, pushPublicKey, removeSubscription, saveSubscription } from "@/server/push";
 import { requireSession } from "@/server/session";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +35,7 @@ export async function POST(req: Request) {
       throw new AppError("PUSH_UNAVAILABLE", "Quiet phone taps aren't set up on this server.", 409);
     }
     const body = subscriptionSchema.parse(await readJson(req));
-    const endpoint = new URL(body.endpoint);
-    if (endpoint.protocol !== "https:") {
+    if (!isPushEndpoint(body.endpoint)) {
       throw new AppError("INVALID_INPUT", "That notification subscription can't be kept.", 400);
     }
     saveSubscription({

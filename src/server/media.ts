@@ -125,25 +125,33 @@ export async function saveMedia(input: { userId: string; bytes: Buffer; now?: nu
   const storageKey = `${id}.${detected.ext}`;
   const hash = createHash("sha256").update(input.bytes).digest("hex");
   const fullPath = safeMediaPath(storageKey);
-  transaction(() => {
-    run(
-      `INSERT INTO media (id, owner_id, relationship_id, storage_key, detected_type, kind, byte_size, sha256, created_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      id,
-      input.userId,
-      relationship.id,
-      storageKey,
-      detected.mime,
-      detected.kind,
-      input.bytes.length,
-      hash,
-      now,
-    );
-  });
   try {
     fs.writeFileSync(fullPath, input.bytes, { flag: "wx" });
+  } catch {
+    throw new AppError("INTERNAL", "That file could not be kept.", 500);
+  }
+  try {
+    transaction(() => {
+      run(
+        `INSERT INTO media (id, owner_id, relationship_id, storage_key, detected_type, kind, byte_size, sha256, created_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        id,
+        input.userId,
+        relationship.id,
+        storageKey,
+        detected.mime,
+        detected.kind,
+        input.bytes.length,
+        hash,
+        now,
+      );
+    });
   } catch (error) {
-    run("DELETE FROM media WHERE id = ?", id);
+    try {
+      fs.unlinkSync(fullPath);
+    } catch {
+      /* the row was not saved */
+    }
     throw error;
   }
   return { id, kind: detected.kind, mime: detected.mime };

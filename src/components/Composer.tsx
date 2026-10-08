@@ -109,7 +109,8 @@ export function Composer({ timezone, partnerName }: { timezone: string; partnerN
         setError(caught.message);
       } else if (caught instanceof ApiError) {
         setError(caught.message);
-        if (caught.code !== "IDEMPOTENCY_CONFLICT") setStep("compose");
+        if (caught.code === "IDEMPOTENCY_CONFLICT") attempt.current = null;
+        else setStep("compose");
       } else {
         setStep("uncertain");
         setError("We didn't get a confirmation.");

@@ -58,12 +58,12 @@ function settleScheduled(id: string, now: number): boolean {
   const petal = one<DuePetal>("SELECT id, relationship_id, type, content_json, status, deleted_at, expires_at, recipient_id FROM petals WHERE id = ?", id);
   if (!petal || petal.deleted_at || petal.status !== "scheduled") return false;
   if (petal.expires_at && petal.expires_at <= now) {
-    const expired = run(
+    run(
       `UPDATE petals SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'scheduled' AND deleted_at IS NULL`,
       now,
       id,
     );
-    return expired.changes === 1;
+    return false;
   }
   const sealed = run(
     `UPDATE petals SET status = 'sealed', updated_at = ? WHERE id = ? AND status = 'scheduled' AND deleted_at IS NULL`,
