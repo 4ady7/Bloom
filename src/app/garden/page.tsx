@@ -27,8 +27,12 @@ export default async function GardenPage({ searchParams }: { searchParams: Promi
         </Link>
       </header>
       <h2>The path</h2>
+      <p className="hint">
+        Every small thing you&apos;ve left each other. For the living soil, open{" "}
+        <Link href="/gardens">your gardens</Link>.
+      </p>
       <GardenScene elements={home.garden.elements} season={home.garden.season} />
-      {page.petals.length === 0 ? <p>The garden is still just soil and patience.</p> : null}
+      {page.petals.length === 0 ? <p>The path is still quiet. That&apos;s alright.</p> : null}
       <div>
         {page.petals.map((petal) => (
           <Link key={petal.id} href={`/petal/${petal.id}`} className="kept">

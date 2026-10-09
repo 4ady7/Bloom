@@ -24,7 +24,9 @@ import {
 } from "./notifications";
 import { processPushQueue, pushConfigured } from "./push";
 import { hitOrThrow } from "./rate-limit";
+import { ensurePrimaryGarden, plantedGardenIdForPetal, primaryGardenPreview } from "./gardens";
 import { getRelationship, requireActiveRelationship, type RelationshipState } from "./relationship";
+import type { PublicGardenFlower } from "@/domain/garden";
 
 const YEAR_MS = 366 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -57,7 +59,7 @@ export interface HomeState {
   unopened: PublicPetal[];
   recent: PublicPetal[];
   upcoming: PublicPetal[];
-  garden: { season: Season; elements: GardenElement[] };
+  garden: { season: Season; elements: GardenElement[]; flowers: PublicGardenFlower[]; primaryGardenId: string | null };
   notes: QuietNote[];
 }
 
@@ -78,17 +80,24 @@ export async function getHome(userId: string, now = Date.now()): Promise<HomeSta
       unopened: [],
       recent: [],
       upcoming: [],
-      garden: { season: seasonFor(now, user.timezone), elements: [] },
+      garden: { season: seasonFor(now, user.timezone), elements: [], flowers: [], primaryGardenId: null },
       notes: [],
     };
   }
+  const primaryGardenId = ensurePrimaryGarden(relationship.id, userId, now);
+  const marks = loadGarden(relationship.id, user.timezone, now);
+  const flowers = primaryGardenPreview(relationship.id, 48);
   return {
     user: viewer,
     relationship,
     unopened: listVisible(userId, relationship.id, "AND p.recipient_id = ? AND p.status = 'sealed' ORDER BY p.created_at ASC LIMIT 12", [userId]),
     recent: listVisible(userId, relationship.id, "AND p.status IN ('sealed', 'opened', 'expired') ORDER BY p.created_at DESC LIMIT 8", []),
     upcoming: listVisible(userId, relationship.id, "AND p.sender_id = ? AND p.status = 'scheduled' ORDER BY p.scheduled_for ASC LIMIT 8", [userId]),
-    garden: loadGarden(relationship.id, user.timezone, now),
+    garden: {
+      ...marks,
+      flowers,
+      primaryGardenId,
+    },
     notes: listQuietNotes(userId),
   };
 }
@@ -550,6 +559,7 @@ function toPublic(row: PetalRow, viewerId: string): PublicPetal {
     openedAt: row.opened_at,
     expiresAt: row.expires_at,
     response: response ? { body: response.body, createdAt: response.created_at } : null,
+    plantedInGardenId: row.type === "flower" ? plantedGardenIdForPetal(row.id) : null,
   };
 }
 

@@ -49,7 +49,9 @@ npm run test:all
 - Leave a petal, preview it, and send it. If the connection drops, retrying the same attempt does not create a second petal.
 - Schedule a petal in your own timezone. Clocks that skip an hour (daylight saving) are rejected. Ambiguous times are stored as one UTC instant.
 - Open a petal. Opening is remembered. You do not have to answer.
-- See the shared garden grow. It is a history, not a score.
+- Keep multiple shared gardens with your partner. Both of you see the same places.
+- When you receive a flower, choose which garden to plant it in. Position and appearance persist.
+- Arrange flowers later. Rename gardens. Change themes. Remove a flower from the soil without deleting the petal from the path.
 - Take a petal back before it is opened.
 - Upload a photo or a short audio clip. The server checks the file bytes, not the name or the claimed type.
 - Optionally receive one quiet Web Push notification, with no message content, if the server has VAPID keys.
@@ -69,6 +71,8 @@ The browser talks only to Route Handlers under `/api`. Those handlers read the s
 
 Petal types live in `src/domain`. Adding a type means extending the shared schema, the garden mapping, a composer, and a view. Sending, listing, opening, and scheduling stay the same.
 
+Gardens belong to a relationship, not a single account. Schema v2 adds `gardens` and `garden_flowers`. Positions use normalized coordinates (0–1) so the same planting reads on phone and desktop. Flower art is a catalog in `src/domain/flowers.ts`; optional image generation is a replaceable provider in `src/server/flower-providers.ts` and never blocks planting.
+
 Scheduled petals are rows with `status = scheduled` and a UTC `scheduled_for`. A small in-process scheduler, plus a check whenever the garden is loaded, delivers anything that is due. Delivery is a compare-and-set update, so it happens once. Cancelling or editing the row is the scheduled task. There is no second queue to forget.
 
 Notifications are rows with a unique idempotency key per petal and channel. In-app delivery is real. Web Push is attempted only when `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` are set. Otherwise the push row is stored as skipped and the product says so. Failed pushes retry with backoff and stop after five attempts. A deleted, cancelled, or expired petal is not pushed.
@@ -84,7 +88,9 @@ SQLite file: `$BLOOM_DATA_DIR/bloom.sqlite`. Media: `$BLOOM_DATA_DIR/media/`.
 - `notifications` with a unique idempotency key
 - `push_subscriptions`
 - `media`
-- `garden_elements` (one per petal)
+- `garden_elements` (soft marks on the path for every petal)
+- `gardens` (many per relationship; one primary “Our Garden”)
+- `garden_flowers` (planted flowers with persistent x/y/scale/rotation)
 - `rate_limits`
 
 Foreign keys are enforced. Petals and accounts are soft-deleted. Leaving a garden dissolves the relationship and hides it from both people.
@@ -139,3 +145,6 @@ Web Push is off until VAPID keys exist. The app does not pretend otherwise.
 - A replaceable random picker, if a gentler one is ever worth it.
 - Southern-hemisphere seasons.
 - More than one Node process, which would mean leaving SQLite.
+- Garden decorations beyond flowers (paths, stones, trees) on the same object model.
+- Zoom/pan once a single garden holds hundreds of blooms.
+- A real image provider behind `BLOOM_IMAGE_API_URL` / `BLOOM_IMAGE_API_KEY`.

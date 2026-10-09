@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { contentReady, emptyContent } from "@/domain/content";
+import { flowerOf } from "@/domain/flowers";
 import { FLOWER_VARIETIES, PETAL_HINT, PETAL_LABEL, SURPRISE_KINDS, type PetalContent, type PetalType, type PublicPetal } from "@/domain/types";
 import { formatWhen } from "@/domain/time";
 import { ApiError, api } from "@/lib/api";
@@ -135,6 +136,7 @@ export function Composer({ timezone, partnerName }: { timezone: string; partnerN
         openedAt: null,
         expiresAt: null,
         response: null,
+        plantedInGardenId: null,
       }
     : null;
 
@@ -295,7 +297,7 @@ function Editor({ type, content, onChange }: { type: PetalType; content: PetalCo
           <select value={content.variety} onChange={(event) => onChange({ ...content, variety: event.target.value as typeof content.variety })}>
             {FLOWER_VARIETIES.map((variety) => (
               <option key={variety} value={variety}>
-                {variety}
+                {flowerOf(variety).label}
               </option>
             ))}
           </select>

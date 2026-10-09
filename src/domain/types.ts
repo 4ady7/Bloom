@@ -1,3 +1,5 @@
+import { FLOWER_KEYS } from "./flowers";
+
 export const PETAL_TYPES = [
   "note",
   "flower",
@@ -10,7 +12,7 @@ export const PETAL_TYPES = [
 
 export type PetalType = (typeof PETAL_TYPES)[number];
 
-export const FLOWER_VARIETIES = ["ranunculus", "poppy", "sweet-pea", "cosmos", "anemone"] as const;
+export const FLOWER_VARIETIES = FLOWER_KEYS;
 export type FlowerVariety = (typeof FLOWER_VARIETIES)[number];
 
 export const SURPRISE_KINDS = ["hold", "stars", "seal"] as const;
@@ -140,6 +142,8 @@ export interface PublicPetal {
   openedAt: number | null;
   expiresAt: number | null;
   response: { body: string; createdAt: number } | null;
+  /** Set when a flower petal has been planted into a shared garden. */
+  plantedInGardenId: string | null;
 }
 
 export interface GardenElement {

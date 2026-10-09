@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { formatWhen } from "@/domain/time";
+import type { PublicGardenFlower } from "@/domain/garden";
 import type { GardenElement, PublicPetal, PublicUser, QuietNote, Season } from "@/domain/types";
 import { GardenScene } from "./GardenScene";
+import { LivingGarden } from "./LivingGarden";
 import { Nav } from "./Chrome";
 
 interface HomeProps {
@@ -12,7 +14,12 @@ interface HomeProps {
   unopened: PublicPetal[];
   recent: PublicPetal[];
   upcoming: PublicPetal[];
-  garden: { season: Season; elements: GardenElement[] };
+  garden: {
+    season: Season;
+    elements: GardenElement[];
+    flowers: PublicGardenFlower[];
+    primaryGardenId: string | null;
+  };
   notes: QuietNote[];
 }
 
@@ -20,20 +27,40 @@ export function HomeView({ home }: { home: HomeProps }) {
   const partner = home.relationship?.partner?.displayName ?? "them";
   const waiting = home.unopened[0];
   const recent = home.recent.filter((petal) => petal.id !== waiting?.id).slice(0, 5);
+  const flowerCount = home.garden.flowers.length;
   const gardenCaption =
-    home.garden.elements.length === 0
-      ? "Nothing here yet. That's alright."
-      : home.garden.elements.length === 1
-        ? "One small thing, so far."
+    flowerCount === 0
+      ? "There is plenty of room for something lovely."
+      : flowerCount === 1
+        ? "One flower, so far."
         : "A little history, growing slowly.";
 
   return (
     <div className={`stage season-${home.garden.season}`}>
       <section className="garden-panel" aria-label="Shared garden">
-        <GardenScene elements={home.garden.elements} season={home.garden.season} caption={gardenCaption} />
+        {home.garden.primaryGardenId ? (
+          <LivingGarden
+            garden={{
+              id: home.garden.primaryGardenId,
+              name: "Our Garden",
+              description: "",
+              theme: "meadow",
+              isPrimary: true,
+              flowerCount,
+              createdAt: 0,
+              updatedAt: 0,
+            }}
+            flowers={home.garden.flowers}
+          />
+        ) : (
+          <GardenScene elements={home.garden.elements} season={home.garden.season} caption={gardenCaption} />
+        )}
         <p className="for-whom">
           for <em>{partner}</em>
         </p>
+        <Link href="/gardens" className="quiet-link">
+          Open your gardens
+        </Link>
       </section>
       <div className="letter">
         <header className="topbar">

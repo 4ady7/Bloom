@@ -144,7 +144,29 @@ export function joinWithCode(userId: string, rawCode: string, now = Date.now()):
   }
   const relationship = getRelationship(userId);
   if (!relationship) throw new AppError("INTERNAL", "Something went wrong. Please try again.", 500);
+  ensureDefaultGardenRow(relationship.id, userId, now);
   return relationship;
+}
+
+function ensureDefaultGardenRow(relationshipId: string, createdBy: string, now: number): void {
+  const existing = one<{ id: string }>(
+    `SELECT id FROM gardens WHERE relationship_id = ? AND is_primary = 1 AND archived_at IS NULL`,
+    relationshipId,
+  );
+  if (existing) return;
+  try {
+    run(
+      `INSERT INTO gardens (id, relationship_id, name, description, theme, is_primary, created_by, created_at, updated_at, archived_at)
+       VALUES (?, ?, 'Our Garden', '', 'meadow', 1, ?, ?, ?, NULL)`,
+      newId(),
+      relationshipId,
+      createdBy,
+      now,
+      now,
+    );
+  } catch {
+    /* migration or concurrent create may already have one */
+  }
 }
 
 export function leaveRelationship(userId: string, now = Date.now()): void {

@@ -34,7 +34,7 @@ export function RefreshOnFocus() {
       const now = Date.now();
       if (now - last < 8000) return;
       last = now;
-      if (pathname === "/home" || pathname === "/garden") router.refresh();
+      if (pathname === "/home" || pathname === "/garden" || pathname.startsWith("/gardens")) router.refresh();
     };
     const id = window.setInterval(tick, 45000);
     window.addEventListener("focus", tick);
@@ -51,14 +51,22 @@ export function RefreshOnFocus() {
 export function Nav() {
   const pathname = usePathname();
   const items = [
-    { href: "/home", label: "Garden" },
+    { href: "/gardens", label: "Gardens" },
     { href: "/send", label: "Give" },
     { href: "/garden", label: "Path" },
   ];
   return (
     <nav className="nav" aria-label="Primary">
       {items.map((item) => (
-        <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined}>
+        <Link
+          key={item.href}
+          href={item.href}
+          aria-current={
+            pathname === item.href || (item.href === "/gardens" && pathname.startsWith("/gardens"))
+              ? "page"
+              : undefined
+          }
+        >
           {item.label}
         </Link>
       ))}

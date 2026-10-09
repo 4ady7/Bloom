@@ -7,6 +7,7 @@ import { formatWhen } from "@/domain/time";
 import { ApiError, api } from "@/lib/api";
 import { FlowerArt } from "./Flowers";
 import { PetalView } from "./PetalView";
+import { PlantChooser } from "./PlantChooser";
 
 export function Reveal({
   initial,
@@ -97,6 +98,12 @@ export function Reveal({
       <div className="unfold">
         <PetalView petal={petal} />
       </div>
+      {!petal.fromYou && petal.type === "flower" && petal.status === "opened" ? <PlantChooser petal={petal} /> : null}
+      {petal.fromYou && petal.type === "flower" && petal.plantedInGardenId ? (
+        <Link className="btn-ghost" href={`/gardens/${petal.plantedInGardenId}`}>
+          See where it grew
+        </Link>
+      ) : null}
       {petal.fromYou && (petal.status === "sealed" || petal.status === "scheduled") ? <TakeBack id={petal.id} /> : null}
       <Link className="quiet-link" href="/home">
         Close
